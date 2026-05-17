@@ -17,9 +17,8 @@ async function bootstrap() {
     }),
   );
 
-  // CORS — allows frontend origin
   app.enableCors({
-    origin: config.get('CORS_ORIGINS', 'http://localhost:3000').split(','),
+    origin: config.get('CORS_ORIGINS', 'http://localhost:3000,https://classitivity.vercel.app').split(','),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

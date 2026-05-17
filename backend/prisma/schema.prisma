@@ -1,0 +1,257 @@
+// Classitivity Platform — Prisma Schema
+// PostgreSQL on Supabase · Multi-tenant SaaS
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────
+
+enum CurriculumVersion {
+  NG
+  UK
+  US
+  AU
+}
+
+enum UserRole {
+  PLATFORM_ADMIN
+  SCHOOL_ADMIN
+  TEACHER
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  EXPIRED
+}
+
+enum BillingCycle {
+  MONTHLY
+  TERMLY
+  ANNUALLY
+}
+
+enum PaymentGateway {
+  PAYSTACK
+  STRIPE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum ResourceType {
+  LESSON_PLAN
+  POWERPOINT
+  STUDENT_NOTES
+  OBJECTIVE_QUESTIONS
+  THEORY_QUESTIONS
+  LESSON_OBJECTIVES
+}
+
+enum ContentStatus {
+  DRAFT
+  REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+// ─── Schools ────────────────────────────────────────────────────────
+
+model School {
+  id               String            @id @default(cuid())
+  name             String
+  slug             String            @unique
+  country          String
+  phone            String?
+  curriculumVersion CurriculumVersion
+  logoUrl          String?
+  isActive         Boolean           @default(true)
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  users            User[]
+  subscriptions    Subscription[]
+  payments         Payment[]
+  accessLogs       AccessLog[]
+
+  @@index([curriculumVersion])
+  @@index([slug])
+}
+
+// ─── Users ──────────────────────────────────────────────────────────
+
+model User {
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  name             String
+  role             UserRole
+  isActive         Boolean  @default(true)
+
+  schoolId         String?
+  school           School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  refreshToken     String?
+  lastLoginAt      DateTime?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  accessLogs       AccessLog[]
+
+  @@index([schoolId])
+  @@index([email])
+  @@index([role])
+}
+
+// ─── Subscriptions ──────────────────────────────────────────────────
+
+model Subscription {
+  id              String             @id @default(cuid())
+  schoolId        String
+  school          School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  gradeLevel      String             // e.g. "JSS2", "Year7", "Grade6"
+  billingCycle    BillingCycle
+  status          SubscriptionStatus @default(TRIAL)
+
+  trialEndsAt     DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+
+  gatewayCustomerId  String?          // Paystack/Stripe customer ID
+  gatewaySubscriptionId String?       // Paystack/Stripe subscription ID
+  gateway            PaymentGateway?
+
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  payments        Payment[]
+
+  @@unique([schoolId, gradeLevel])
+  @@index([status])
+  @@index([schoolId])
+}
+
+// ─── Payments ───────────────────────────────────────────────────────
+
+model Payment {
+  id              String         @id @default(cuid())
+  schoolId        String
+  school          School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subscriptionId  String
+  subscription    Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  amount          Int            // Amount in smallest currency unit (kobo, cents)
+  currency        String         // NGN, GBP, USD, AUD
+  gateway         PaymentGateway
+  gatewayRef      String?        @unique
+  status          PaymentStatus  @default(PENDING)
+  metadata        Json?
+
+  paidAt          DateTime?
+  createdAt       DateTime       @default(now())
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([gatewayRef])
+}
+
+// ─── Content Hierarchy ──────────────────────────────────────────────
+
+model Subject {
+  id               String            @id @default(cuid())
+  name             String
+  code             String
+  curriculumVersion CurriculumVersion
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  lessons          Lesson[]
+
+  @@unique([code, curriculumVersion])
+  @@index([curriculumVersion])
+}
+
+model Lesson {
+  id              String         @id @default(cuid())
+  subjectId       String
+  subject         Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  gradeLevel      String
+  term            Int            // 1, 2, 3
+  week            Int
+  title           String
+  description     String?
+
+  status          ContentStatus  @default(DRAFT)
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  resources       Resource[]
+  accessLogs      AccessLog[]
+
+  @@unique([subjectId, gradeLevel, term, week])
+  @@index([gradeLevel])
+  @@index([status])
+}
+
+model Resource {
+  id              String       @id @default(cuid())
+  lessonId        String
+  lesson          Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  type            ResourceType
+  fileName        String
+  fileSize        Int          // bytes
+  mimeType        String
+  r2Key           String       @unique  // Cloudflare R2 object key
+  r2Bucket        String       @default("classitivity-content")
+
+  // Pricing — admin sets price per document
+  price           Int          @default(0)    // Price in smallest currency unit (kobo, cents). 0 = free
+  currency        String       @default("NGN")
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([lessonId, type])
+  @@index([lessonId])
+}
+
+// ─── Access Logging (for analytics & DRM auditing) ──────────────────
+
+model AccessLog {
+  id              String       @id @default(cuid())
+  userId          String
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId        String
+  school          School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lessonId        String?
+  lesson          Lesson?      @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+
+  action          String       // "view_lesson", "download_notes", "view_slides", etc.
+  resourceType    ResourceType?
+  ipAddress       String?
+  userAgent       String?
+
+  createdAt       DateTime     @default(now())
+
+  @@index([userId])
+  @@index([schoolId])
+  @@index([createdAt])
+}

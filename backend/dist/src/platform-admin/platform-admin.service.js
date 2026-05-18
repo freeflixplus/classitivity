@@ -60,6 +60,7 @@ let PlatformAdminService = class PlatformAdminService {
             this.prisma.lesson.findMany({
                 include: {
                     subject: true,
+                    resources: { select: { id: true, type: true, fileName: true, fileSize: true } },
                     _count: { select: { resources: true } }
                 },
                 orderBy: { createdAt: 'desc' },

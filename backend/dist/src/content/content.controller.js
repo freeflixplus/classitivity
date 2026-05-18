@@ -67,12 +67,18 @@ __decorate([
     (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', {
         limits: { fileSize: 50 * 1024 * 1024 },
         fileFilter: (_req, file, cb) => {
-            const allowed = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
-            if (allowed.includes(file.mimetype)) {
+            const allowed = [
+                'application/pdf',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'application/vnd.ms-powerpoint',
+                'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            ];
+            if (allowed.includes(file.mimetype) || file.originalname.match(/\.(pdf|docx?|pptx?)$/i)) {
                 cb(null, true);
             }
             else {
-                cb(new common_1.BadRequestException('Only PDF and PPTX files are allowed'), false);
+                cb(new common_1.BadRequestException(`File type not supported: ${file.mimetype}. Allowed: PDF, DOC, DOCX, PPT, PPTX`), false);
             }
         },
     })),

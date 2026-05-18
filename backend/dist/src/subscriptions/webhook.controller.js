@@ -44,25 +44,17 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 var WebhookController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WebhookController = void 0;
 const common_1 = require("@nestjs/common");
 const subscription_service_1 = require("./subscription.service");
-const stripe_1 = __importDefault(require("stripe"));
 const crypto = __importStar(require("crypto"));
 let WebhookController = WebhookController_1 = class WebhookController {
     subscriptionService;
-    stripe;
     logger = new common_1.Logger(WebhookController_1.name);
     constructor(subscriptionService) {
         this.subscriptionService = subscriptionService;
-        this.stripe = new stripe_1.default(process.env.STRIPE_SECRET_KEY || 'dummy_key', {
-            apiVersion: '2025-01-27.acacia',
-        });
     }
     async handleStripeWebhook(req, res, signature) {
         const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -70,29 +62,30 @@ let WebhookController = WebhookController_1 = class WebhookController {
             this.logger.warn('Stripe webhook secret not configured.');
             return res.status(400).send('Webhook secret not configured');
         }
-        let event;
         try {
-            event = this.stripe.webhooks.constructEvent(req.rawBody || JSON.stringify(req.body), signature, endpointSecret);
+            const Stripe = require('stripe');
+            const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'dummy_key');
+            const event = stripe.webhooks.constructEvent(req.rawBody || JSON.stringify(req.body), signature, endpointSecret);
+            if (event.type === 'checkout.session.completed') {
+                const session = event.data.object;
+                if (session.metadata?.schoolId && session.metadata?.gradeLevel) {
+                    await this.subscriptionService.handlePaymentSuccess({
+                        schoolId: session.metadata.schoolId,
+                        gradeLevel: session.metadata.gradeLevel,
+                        billingCycle: session.metadata.billingCycle || 'MONTHLY',
+                        amount: session.amount_total,
+                        currency: session.currency.toUpperCase(),
+                        gateway: 'STRIPE',
+                        gatewayRef: session.payment_intent,
+                        customerId: session.customer,
+                        subscriptionId: session.subscription,
+                    });
+                }
+            }
         }
         catch (err) {
-            this.logger.error(`Webhook Error: ${err.message}`);
+            this.logger.error(`Stripe Webhook Error: ${err.message}`);
             return res.status(400).send(`Webhook Error: ${err.message}`);
-        }
-        if (event.type === 'checkout.session.completed') {
-            const session = event.data.object;
-            if (session.metadata?.schoolId && session.metadata?.gradeLevel) {
-                await this.subscriptionService.handlePaymentSuccess({
-                    schoolId: session.metadata.schoolId,
-                    gradeLevel: session.metadata.gradeLevel,
-                    billingCycle: session.metadata.billingCycle || 'MONTHLY',
-                    amount: session.amount_total,
-                    currency: session.currency.toUpperCase(),
-                    gateway: 'STRIPE',
-                    gatewayRef: session.payment_intent,
-                    customerId: session.customer,
-                    subscriptionId: session.subscription,
-                });
-            }
         }
         res.status(200).send();
     }

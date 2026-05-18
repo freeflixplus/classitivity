@@ -97,9 +97,9 @@ export default function AllCoursesPage() {
                   <td className="px-5 py-4 text-sm text-surface-600 dark:text-surface-300">{l.subject?.name}</td>
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm text-surface-600 dark:text-surface-300">{l._count?.resources || 0}/6</span>
+                      <span className="text-sm text-surface-600 dark:text-surface-300">{l.resources?.length || l._count?.resources || 0}/6</span>
                       <div className="w-16 bg-surface-200 dark:bg-surface-700 rounded-full h-1.5">
-                        <div className="bg-brand-500 h-1.5 rounded-full" style={{ width: `${((l._count?.resources || 0) / 6) * 100}%` }} />
+                        <div className="bg-brand-500 h-1.5 rounded-full" style={{ width: `${((l.resources?.length || l._count?.resources || 0) / 6) * 100}%` }} />
                       </div>
                     </div>
                   </td>

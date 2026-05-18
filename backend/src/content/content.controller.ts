@@ -34,11 +34,17 @@ export class ContentController {
   @UseInterceptors(FileInterceptor('file', {
     limits: { fileSize: 50 * 1024 * 1024 }, // 50MB max
     fileFilter: (_req, file, cb) => {
-      const allowed = ['application/pdf', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'];
-      if (allowed.includes(file.mimetype)) {
+      const allowed = [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.ms-powerpoint',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ];
+      if (allowed.includes(file.mimetype) || file.originalname.match(/\.(pdf|docx?|pptx?)$/i)) {
         cb(null, true);
       } else {
-        cb(new BadRequestException('Only PDF and PPTX files are allowed'), false);
+        cb(new BadRequestException(`File type not supported: ${file.mimetype}. Allowed: PDF, DOC, DOCX, PPT, PPTX`), false);
       }
     },
   }))

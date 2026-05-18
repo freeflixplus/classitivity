@@ -51,6 +51,12 @@ export declare class PlatformAdminService {
             _count: {
                 resources: number;
             };
+            resources: {
+                id: string;
+                type: import("@prisma/client").$Enums.ResourceType;
+                fileName: string;
+                fileSize: number;
+            }[];
         } & {
             id: string;
             createdAt: Date;

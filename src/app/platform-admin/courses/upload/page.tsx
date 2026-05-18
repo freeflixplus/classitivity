@@ -1,7 +1,7 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Card, Button, Badge, Input } from "@/components/ui";
+import { Card, Button, Badge } from "@/components/ui";
 import { platformAdmin } from "@/lib/api";
 
 interface UploadFile {
@@ -12,15 +12,16 @@ interface UploadFile {
   price: string;
   currency: string;
   resourceType: string;
+  errorMessage?: string;
 }
 
 const RESOURCE_TYPES = [
-  { value: "LESSON_PLAN", label: "Lesson Plan" },
-  { value: "POWERPOINT", label: "Presentation (PPT)" },
-  { value: "STUDENT_NOTES", label: "Student Notes" },
-  { value: "OBJECTIVE_QUESTIONS", label: "Objective Questions" },
-  { value: "THEORY_QUESTIONS", label: "Theory Questions" },
-  { value: "LESSON_OBJECTIVES", label: "Lesson Objectives" },
+  { value: "LESSON_PLAN", label: "Lesson Plan", icon: "📄" },
+  { value: "POWERPOINT", label: "Presentation (PPT)", icon: "📊" },
+  { value: "STUDENT_NOTES", label: "Student Notes", icon: "📝" },
+  { value: "OBJECTIVE_QUESTIONS", label: "Objective Questions", icon: "✅" },
+  { value: "THEORY_QUESTIONS", label: "Theory Questions", icon: "📋" },
+  { value: "LESSON_OBJECTIVES", label: "Lesson Objectives", icon: "🎯" },
 ];
 
 const CURRENCIES = [
@@ -39,33 +40,41 @@ export default function UploadResourcesPage() {
   const [globalCurrency, setGlobalCurrency] = useState("NGN");
   const [availableLessons, setAvailableLessons] = useState<any[]>([]);
   const [loadingLessons, setLoadingLessons] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  // Toast notification state
+  const [toast, setToast] = useState<{ show: boolean; type: "success" | "error"; title: string; message: string }>({
+    show: false, type: "success", title: "", message: "",
+  });
 
-  React.useEffect(() => {
-    platformAdmin.getLessons(1, 100)
+  useEffect(() => {
+    platformAdmin.getLessons(1, 200)
       .then(res => setAvailableLessons(res.data || []))
       .catch(err => console.error("Failed to load lessons", err))
       .finally(() => setLoadingLessons(false));
   }, []);
 
+  const showToast = useCallback((type: "success" | "error", title: string, message: string) => {
+    setToast({ show: true, type, title, message });
+    setTimeout(() => setToast(prev => ({ ...prev, show: false })), 5000);
+  }, []);
+
   const addFiles = (fileList: FileList) => {
-    const accepted = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-      "application/msword",
-      "application/vnd.ms-powerpoint",
-    ];
     const newFiles: UploadFile[] = Array.from(fileList)
-      .filter((f) => accepted.includes(f.type) || f.name.match(/\.(pdf|docx?|pptx?)$/i))
+      .filter((f) => f.name.match(/\.(pdf|docx?|pptx?)$/i))
       .map((f) => ({
         file: f,
         id: Math.random().toString(36).slice(2),
         status: "pending" as const,
         progress: 0,
-        price: "",
+        price: "0",
         currency: globalCurrency,
         resourceType: f.name.match(/\.pptx?$/i) ? "POWERPOINT" : f.name.match(/\.pdf$/i) ? "LESSON_PLAN" : "STUDENT_NOTES",
       }));
+    
+    if (newFiles.length === 0 && fileList.length > 0) {
+      showToast("error", "Unsupported File", "Only PDF, DOC, DOCX, PPT, and PPTX files are supported.");
+      return;
+    }
     setFiles((prev) => [...prev, ...newFiles]);
   };
 
@@ -81,48 +90,71 @@ export default function UploadResourcesPage() {
 
   const handleUploadAll = async () => {
     if (!lessonId) {
-      alert("Please select a course/lesson to assign these resources to.");
+      showToast("error", "No Course Selected", "Please select a course/lesson to assign these resources to before uploading.");
       return;
     }
 
     const pendingFiles = files.filter((f) => f.status === "pending");
-    
-    for (const f of pendingFiles) {
-      if (!f.price || parseFloat(f.price) < 0) {
-        alert(`Please set a price for "${f.file.name}". Set 0 for free documents.`);
-        return;
-      }
+    if (pendingFiles.length === 0) {
+      showToast("error", "No Files", "Please add files to upload first.");
+      return;
     }
 
+    setIsUploading(true);
+    let successCount = 0;
+    let failCount = 0;
+    const errors: string[] = [];
+
     for (const f of pendingFiles) {
-      updateFile(f.id, { status: "uploading" });
-      
+      updateFile(f.id, { status: "uploading", progress: 10 });
+
       try {
-        // Upload the file via FormData (with pricing attached)
+        // Simulate progress during network upload
+        const progressInterval = setInterval(() => {
+          setFiles(prev => prev.map(pf => {
+            if (pf.id === f.id && pf.status === "uploading" && pf.progress < 85) {
+              return { ...pf, progress: pf.progress + Math.random() * 15 };
+            }
+            return pf;
+          }));
+        }, 300);
+
         await platformAdmin.uploadResource(
           lessonId,
           f.file,
           f.resourceType,
-          Math.round(parseFloat(f.price) * 100), // Convert to smallest unit
+          Math.round(parseFloat(f.price || "0") * 100),
           f.currency
         );
 
-        // Simulate upload progress
-        for (let p = 0; p <= 100; p += 25) {
-          await new Promise((r) => setTimeout(r, 200));
-          updateFile(f.id, { progress: Math.min(p, 100) });
-        }
-        
+        clearInterval(progressInterval);
         updateFile(f.id, { status: "done", progress: 100 });
-      } catch (err) {
-        console.error("Upload failed for", f.file.name, err);
-        updateFile(f.id, { status: "error" });
+        successCount++;
+      } catch (err: any) {
+        const errMsg = err?.message || "Unknown error occurred during upload.";
+        updateFile(f.id, { status: "error", errorMessage: errMsg });
+        failCount++;
+        errors.push(`${f.file.name}: ${errMsg}`);
       }
+    }
+
+    setIsUploading(false);
+
+    if (failCount === 0) {
+      showToast("success", "Upload Complete! ✅", `${successCount} file${successCount > 1 ? "s" : ""} uploaded successfully.`);
+    } else if (successCount === 0) {
+      showToast("error", "Upload Failed ❌", errors.join("\n"));
+    } else {
+      showToast("error", "Partial Upload", `${successCount} succeeded, ${failCount} failed.\n${errors.join("\n")}`);
     }
   };
 
   const removeFile = (id: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const retryFile = (id: string) => {
+    updateFile(id, { status: "pending", progress: 0, errorMessage: undefined });
   };
 
   const getFileIcon = (name: string) => {
@@ -132,10 +164,46 @@ export default function UploadResourcesPage() {
     return { color: "text-surface-500 bg-surface-50 dark:bg-surface-700", label: "FILE" };
   };
 
-  const currSymbol = CURRENCIES.find((c) => c.value === globalCurrency)?.symbol || "₦";
+  const doneCount = files.filter(f => f.status === "done").length;
+  const errorCount = files.filter(f => f.status === "error").length;
+  const pendingCount = files.filter(f => f.status === "pending").length;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
+      {/* Toast notification */}
+      {toast.show && (
+        <div className="fixed top-6 right-6 z-[100] animate-in slide-in-from-top-4 fade-in duration-300 max-w-md">
+          <div className={`rounded-2xl shadow-2xl border p-5 ${
+            toast.type === "success" 
+              ? "bg-emerald-50 dark:bg-emerald-900/90 border-emerald-200 dark:border-emerald-700"
+              : "bg-red-50 dark:bg-red-900/90 border-red-200 dark:border-red-700"
+          }`}>
+            <div className="flex items-start gap-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                toast.type === "success" ? "bg-emerald-100 dark:bg-emerald-800" : "bg-red-100 dark:bg-red-800"
+              }`}>
+                {toast.type === "success" ? (
+                  <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                ) : (
+                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-bold ${
+                  toast.type === "success" ? "text-emerald-800 dark:text-emerald-300" : "text-red-800 dark:text-red-300"
+                }`}>{toast.title}</p>
+                <p className={`text-xs mt-1 whitespace-pre-line ${
+                  toast.type === "success" ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                }`}>{toast.message}</p>
+              </div>
+              <button onClick={() => setToast(p => ({ ...p, show: false }))} className="text-surface-400 hover:text-surface-600">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">Upload Resources</h1>
         <p className="text-surface-500 dark:text-surface-400 text-sm mt-1">
@@ -168,26 +236,32 @@ export default function UploadResourcesPage() {
               value={lessonId}
               onChange={(e) => setLessonId(e.target.value)}
               disabled={loadingLessons}
-              className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-4 py-2.5 text-sm text-surface-800 dark:text-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400"
+              className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-4 py-2.5 text-sm text-surface-800 dark:text-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 disabled:opacity-50"
             >
               <option value="" disabled>
-                {loadingLessons ? "Loading courses..." : "Select a course/lesson..."}
+                {loadingLessons ? "Loading courses..." : availableLessons.length === 0 ? "No courses found — create one first" : "Select a course/lesson..."}
               </option>
               {availableLessons.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.subject?.name} ({l.gradeLevel}) - Term {l.term} Week {l.week}: {l.title}
+                  {l.subject?.name || "Unknown"} ({l.gradeLevel}) — Term {l.term} Week {l.week}: {l.title}
                 </option>
               ))}
             </select>
+            {!loadingLessons && availableLessons.length === 0 && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                No courses exist yet.{" "}
+                <a href="/platform-admin/courses/new" className="underline font-medium">Create a course first</a> to upload resources.
+              </p>
+            )}
           </div>
         </div>
       </Card>
 
       {/* Drop zone */}
       <Card
-        className={`border-2 border-dashed transition-colors cursor-pointer ${
+        className={`border-2 border-dashed transition-all duration-200 cursor-pointer ${
           dragActive
-            ? "border-brand-500 bg-brand-50/50 dark:bg-brand-500/10"
+            ? "border-brand-500 bg-brand-50/50 dark:bg-brand-500/10 scale-[1.01]"
             : "border-surface-300 dark:border-surface-700 hover:border-brand-400 dark:hover:border-brand-500"
         }`}
         padding="lg"
@@ -199,7 +273,9 @@ export default function UploadResourcesPage() {
           onClick={() => fileInputRef.current?.click()}
           className="flex flex-col items-center gap-4 py-8"
         >
-          <div className="w-16 h-16 rounded-2xl bg-brand-50 dark:bg-brand-500/20 flex items-center justify-center">
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center transition-colors ${
+            dragActive ? "bg-brand-100 dark:bg-brand-500/30" : "bg-brand-50 dark:bg-brand-500/20"
+          }`}>
             <svg className="w-8 h-8 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
@@ -221,22 +297,35 @@ export default function UploadResourcesPage() {
         </div>
       </Card>
 
-      {/* File list with PRICING */}
+      {/* File list */}
       {files.length > 0 && (
         <Card padding="none" className="overflow-hidden">
           <div className="px-5 py-3 bg-surface-50 dark:bg-surface-800/50 border-b border-surface-200 dark:border-surface-700 flex items-center justify-between">
-            <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
-              {files.length} file{files.length > 1 ? "s" : ""} — Set price for each document
-            </span>
-            <Button size="sm" onClick={handleUploadAll} disabled={files.every(f => f.status === "done")}>
-              Upload & Save All
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
+                {files.length} file{files.length > 1 ? "s" : ""}
+              </span>
+              {doneCount > 0 && <Badge variant="success">{doneCount} uploaded</Badge>}
+              {errorCount > 0 && <Badge variant="danger">{errorCount} failed</Badge>}
+              {pendingCount > 0 && <Badge variant="default">{pendingCount} pending</Badge>}
+            </div>
+            <Button
+              size="sm"
+              onClick={handleUploadAll}
+              disabled={isUploading || pendingCount === 0}
+              loading={isUploading}
+            >
+              {isUploading ? "Uploading..." : `Upload ${pendingCount > 0 ? pendingCount : "All"} File${pendingCount !== 1 ? "s" : ""}`}
             </Button>
           </div>
           <div className="divide-y divide-surface-200 dark:divide-surface-800">
             {files.map((f) => {
               const icon = getFileIcon(f.file.name);
               return (
-                <div key={f.id} className="px-5 py-4">
+                <div key={f.id} className={`px-5 py-4 transition-colors ${
+                  f.status === "done" ? "bg-emerald-50/30 dark:bg-emerald-500/5" : 
+                  f.status === "error" ? "bg-red-50/30 dark:bg-red-500/5" : ""
+                }`}>
                   <div className="flex items-start gap-4">
                     <span className={`text-xs font-bold px-2.5 py-1.5 rounded-lg ${icon.color}`}>
                       {icon.label}
@@ -244,18 +333,35 @@ export default function UploadResourcesPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-surface-800 dark:text-white truncate">{f.file.name}</p>
                       <p className="text-xs text-surface-400">{(f.file.size / 1024 / 1024).toFixed(2)} MB</p>
+                      {f.status === "error" && f.errorMessage && (
+                        <p className="text-xs text-red-500 dark:text-red-400 mt-1">⚠️ {f.errorMessage}</p>
+                      )}
                     </div>
-                    {f.status === "done" && <Badge variant="success">Uploaded</Badge>}
-                    {f.status === "error" && <Badge variant="danger">Failed</Badge>}
+                    {f.status === "done" && (
+                      <div className="flex items-center gap-1.5">
+                        <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        <Badge variant="success">Uploaded</Badge>
+                      </div>
+                    )}
+                    {f.status === "error" && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="danger">Failed</Badge>
+                        <button onClick={() => retryFile(f.id)} className="text-xs text-brand-500 hover:text-brand-600 font-medium underline">Retry</button>
+                      </div>
+                    )}
                     {f.status === "uploading" && (
-                      <div className="w-24 mt-1">
-                        <div className="w-full bg-surface-200 dark:bg-surface-700 rounded-full h-1.5">
-                          <div className="bg-brand-500 h-1.5 rounded-full transition-all" style={{ width: `${f.progress}%` }} />
+                      <div className="flex items-center gap-2 w-32">
+                        <div className="flex-1 bg-surface-200 dark:bg-surface-700 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="bg-gradient-to-r from-brand-400 to-brand-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(f.progress, 100)}%` }}
+                          />
                         </div>
+                        <span className="text-xs text-brand-500 font-medium whitespace-nowrap">{Math.round(f.progress)}%</span>
                       </div>
                     )}
                     {f.status === "pending" && (
-                      <button onClick={() => removeFile(f.id)} className="text-surface-400 hover:text-red-500 transition-colors">
+                      <button onClick={() => removeFile(f.id)} className="text-surface-400 hover:text-red-500 transition-colors p-1">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       </button>
                     )}
@@ -292,7 +398,7 @@ export default function UploadResourcesPage() {
                           className="rounded-lg border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-3 py-2 text-sm text-surface-800 dark:text-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                         >
                           {RESOURCE_TYPES.map((t) => (
-                            <option key={t.value} value={t.value}>{t.label}</option>
+                            <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
                           ))}
                         </select>
                       </div>

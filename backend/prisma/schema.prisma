@@ -22,6 +22,7 @@ enum UserRole {
   PLATFORM_ADMIN
   SCHOOL_ADMIN
   TEACHER
+  STUDENT
 }
 
 enum SubscriptionStatus {
@@ -69,22 +70,25 @@ enum ContentStatus {
 // ─── Schools ────────────────────────────────────────────────────────
 
 model School {
-  id               String            @id @default(cuid())
-  name             String
-  slug             String            @unique
-  country          String
-  phone            String?
+  id                String            @id @default(cuid())
+  name              String
+  slug              String            @unique
+  country           String
+  address           String?
+  phone             String?
   curriculumVersion CurriculumVersion
-  logoUrl          String?
-  isActive         Boolean           @default(true)
+  logoUrl           String?
+  isActive          Boolean           @default(true)
+  trialEndsAt       DateTime?
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  users            User[]
-  subscriptions    Subscription[]
-  payments         Payment[]
-  accessLogs       AccessLog[]
+  users         User[]
+  subscriptions Subscription[]
+  payments      Payment[]
+  accessLogs    AccessLog[]
+  downloadLogs  DownloadLog[]
 
   @@index([curriculumVersion])
   @@index([slug])
@@ -93,23 +97,25 @@ model School {
 // ─── Users ──────────────────────────────────────────────────────────
 
 model User {
-  id               String   @id @default(cuid())
-  email            String   @unique
-  passwordHash     String
-  name             String
-  role             UserRole
-  isActive         Boolean  @default(true)
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole
+  isActive     Boolean  @default(true)
 
-  schoolId         String?
-  school           School?  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String?
+  school   School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  refreshToken     String?
-  lastLoginAt      DateTime?
+  refreshToken String?
+  lastLoginAt  DateTime?
 
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   accessLogs       AccessLog[]
+  downloadLogs     DownloadLog[]
+  classAssignments TeacherClassAssignment[]
 
   @@index([schoolId])
   @@index([email])
@@ -119,26 +125,26 @@ model User {
 // ─── Subscriptions ──────────────────────────────────────────────────
 
 model Subscription {
-  id              String             @id @default(cuid())
-  schoolId        String
-  school          School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  gradeLevel      String             // e.g. "JSS2", "Year7", "Grade6"
-  billingCycle    BillingCycle
-  status          SubscriptionStatus @default(TRIAL)
+  gradeLevel   String // e.g. "JSS2", "Year7", "Grade6"
+  billingCycle BillingCycle
+  status       SubscriptionStatus @default(TRIAL)
 
-  trialEndsAt     DateTime?
+  trialEndsAt        DateTime?
   currentPeriodStart DateTime?
   currentPeriodEnd   DateTime?
 
-  gatewayCustomerId  String?          // Paystack/Stripe customer ID
-  gatewaySubscriptionId String?       // Paystack/Stripe subscription ID
-  gateway            PaymentGateway?
+  gatewayCustomerId     String? // Paystack/Stripe customer ID
+  gatewaySubscriptionId String? // Paystack/Stripe subscription ID
+  gateway               PaymentGateway?
 
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  payments        Payment[]
+  payments Payment[]
 
   @@unique([schoolId, gradeLevel])
   @@index([status])
@@ -148,21 +154,21 @@ model Subscription {
 // ─── Payments ───────────────────────────────────────────────────────
 
 model Payment {
-  id              String         @id @default(cuid())
-  schoolId        String
-  school          School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  subscriptionId  String
-  subscription    Subscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  schoolId       String
+  school         School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
-  amount          Int            // Amount in smallest currency unit (kobo, cents)
-  currency        String         // NGN, GBP, USD, AUD
-  gateway         PaymentGateway
-  gatewayRef      String?        @unique
-  status          PaymentStatus  @default(PENDING)
-  metadata        Json?
+  amount     Int // Amount in smallest currency unit (kobo, cents)
+  currency   String // NGN, GBP, USD, AUD
+  gateway    PaymentGateway
+  gatewayRef String?        @unique
+  status     PaymentStatus  @default(PENDING)
+  metadata   Json?
 
-  paidAt          DateTime?
-  createdAt       DateTime       @default(now())
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
 
   @@index([schoolId])
   @@index([status])
@@ -172,62 +178,73 @@ model Payment {
 // ─── Content Hierarchy ──────────────────────────────────────────────
 
 model Subject {
-  id               String            @id @default(cuid())
-  name             String
-  code             String
+  id                String            @id @default(cuid())
+  name              String
+  code              String
   curriculumVersion CurriculumVersion
 
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  lessons          Lesson[]
+  classId String?
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  lessons      Lesson[]
+  terms        Term[]
+  schemeOfWork SchemeOfWork[]
 
   @@unique([code, curriculumVersion])
   @@index([curriculumVersion])
+  @@index([classId])
 }
 
 model Lesson {
-  id              String         @id @default(cuid())
-  subjectId       String
-  subject         Subject        @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  id        String  @id @default(cuid())
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  gradeLevel      String
-  term            Int            // 1, 2, 3
-  week            Int
-  title           String
-  description     String?
+  gradeLevel  String
+  term        Int // 1, 2, 3
+  week        Int
+  title       String
+  description String?
 
-  status          ContentStatus  @default(DRAFT)
+  status ContentStatus @default(DRAFT)
 
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  resources       Resource[]
-  accessLogs      AccessLog[]
+  topicId String?
+  topic   Topic?  @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  resources  Resource[]
+  accessLogs AccessLog[]
 
   @@unique([subjectId, gradeLevel, term, week])
   @@index([gradeLevel])
   @@index([status])
+  @@index([topicId])
 }
 
 model Resource {
-  id              String       @id @default(cuid())
-  lessonId        String
-  lesson          Lesson       @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id       String @id @default(cuid())
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 
-  type            ResourceType
-  fileName        String
-  fileSize        Int          // bytes
-  mimeType        String
-  r2Key           String       @unique  // Cloudflare R2 object key
-  r2Bucket        String       @default("classitivity-content")
+  type     ResourceType
+  fileName String
+  fileSize Int // bytes
+  mimeType String
+  r2Key    String       @unique // Cloudflare R2 object key
+  r2Bucket String       @default("classitivity-content")
 
   // Pricing — admin sets price per document
-  price           Int          @default(0)    // Price in smallest currency unit (kobo, cents). 0 = free
-  currency        String       @default("NGN")
+  price    Int    @default(0) // Price in smallest currency unit (kobo, cents). 0 = free
+  currency String @default("NGN")
 
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  downloadLogs DownloadLog[]
 
   @@unique([lessonId, type])
   @@index([lessonId])
@@ -236,22 +253,88 @@ model Resource {
 // ─── Access Logging (for analytics & DRM auditing) ──────────────────
 
 model AccessLog {
-  id              String       @id @default(cuid())
-  userId          String
-  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  schoolId        String
-  school          School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  lessonId        String?
-  lesson          Lesson?      @relation(fields: [lessonId], references: [id], onDelete: SetNull)
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId String
+  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  lessonId String?
+  lesson   Lesson? @relation(fields: [lessonId], references: [id], onDelete: SetNull)
 
-  action          String       // "view_lesson", "download_notes", "view_slides", etc.
-  resourceType    ResourceType?
-  ipAddress       String?
-  userAgent       String?
+  action       String // "view_lesson", "download_notes", "view_slides", etc.
+  resourceType ResourceType?
+  ipAddress    String?
+  userAgent    String?
 
-  createdAt       DateTime     @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([schoolId])
   @@index([createdAt])
+}
+
+// ─── ALIGNMENT WITH COMPREHENSIVE WORKFLOW PROMPT ───────────────────
+
+model Class {
+  id                String            @id @default(cuid())
+  curriculumVersion CurriculumVersion
+  gradeLabel        String // e.g. "Primary 1", "JSS 2"
+  gradeCode         String // e.g. "PRI1", "JSS2"
+
+  subjects    Subject[]
+  assignments TeacherClassAssignment[]
+}
+
+model Term {
+  id         String  @id @default(cuid())
+  subjectId  String
+  subject    Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  label      String // e.g. "First Term"
+  orderIndex Int // 1, 2, 3
+
+  topics       Topic[]
+  schemeOfWork SchemeOfWork[]
+}
+
+model Topic {
+  id           String @id @default(cuid())
+  termId       String
+  term         Term   @relation(fields: [termId], references: [id], onDelete: Cascade)
+  title        String
+  weekNumber   Int
+  lessonNumber Int
+
+  lessons      Lesson[]
+  schemeOfWork SchemeOfWork[]
+}
+
+model SchemeOfWork {
+  id          String  @id @default(cuid())
+  subjectId   String
+  subject     Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  topicId     String
+  topic       Topic   @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  termId      String
+  term        Term    @relation(fields: [termId], references: [id], onDelete: Cascade)
+  weekNumber  Int
+  lessonCount Int
+}
+
+model TeacherClassAssignment {
+  id        String @id @default(cuid())
+  teacherId String
+  teacher   User   @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classId   String
+  class     Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+}
+
+model DownloadLog {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonResourceId String
+  resource         Resource @relation(fields: [lessonResourceId], references: [id], onDelete: Cascade)
+  schoolId         String
+  school           School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  downloadedAt     DateTime @default(now())
 }

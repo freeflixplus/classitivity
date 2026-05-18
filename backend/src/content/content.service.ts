@@ -198,4 +198,37 @@ export class ContentService {
 
     return { message: 'Resource deleted successfully' };
   }
+
+  async getContentTree(version: string) {
+    return this.prisma.class.findMany({
+      where: { curriculumVersion: version.toUpperCase() as any },
+      include: {
+        subjects: {
+          include: {
+            terms: {
+              include: {
+                topics: {
+                  include: {
+                    lessons: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  async createSchemeOfWork(dto: any) {
+    return this.prisma.schemeOfWork.create({
+      data: {
+        subjectId: dto.subjectId,
+        topicId: dto.topicId,
+        termId: dto.termId,
+        weekNumber: dto.weekNumber,
+        lessonCount: dto.lessonCount,
+      }
+    });
+  }
 }

@@ -117,4 +117,22 @@ export class ContentController {
   async deleteResource(@Param('id') id: string) {
     return this.contentService.deleteResource(id);
   }
+
+  /**
+   * Get full hierarchical content tree for a curriculum version
+   * GET /admin/content/content-tree/:version
+   */
+  @Get('content-tree/:version')
+  async getContentTree(@Param('version') version: string) {
+    return this.contentService.getContentTree(version);
+  }
+
+  /**
+   * Create a scheme of work entry
+   * POST /admin/content/scheme-of-work
+   */
+  @Post('scheme-of-work')
+  async createSchemeOfWork(@Body() dto: any) {
+    return this.contentService.createSchemeOfWork(dto);
+  }
 }

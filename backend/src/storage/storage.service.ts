@@ -12,7 +12,7 @@ export class StorageService {
     this.bucket = config.get('SUPABASE_STORAGE_BUCKET', 'content');
 
     const supabaseUrl = config.get('SUPABASE_URL', '');
-    const supabaseServiceKey = config.get('SUPABASE_SERVICE_KEY', '');
+    const supabaseServiceKey = config.get('SUPABASE_SERVICE_ROLE_KEY') || config.get('SUPABASE_SERVICE_KEY', '');
 
     if (!supabaseUrl || !supabaseServiceKey) {
       this.logger.warn('Supabase Storage credentials not configured — file operations will fail');

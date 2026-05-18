@@ -284,7 +284,7 @@ export default function UploadResourcesPage() {
             <p className="text-sm font-medium text-surface-800 dark:text-white">
               Drag & drop files here, or <span className="text-brand-500 underline">browse</span>
             </p>
-            <p className="text-xs text-surface-400 mt-1">Supported: PDF, DOCX, PPTX · Max 50 MB per file</p>
+            <p className="text-xs text-surface-400 mt-1">Supported: PDF, DOC, DOCX, PPT, PPTX · Max 50 MB per file</p>
           </div>
           <input
             ref={fileInputRef}
@@ -423,25 +423,14 @@ export default function UploadResourcesPage() {
         </Card>
       )}
 
-      {/* Security & workflow info */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="flex items-start gap-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-4 border border-emerald-200 dark:border-emerald-500/20">
-          <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-          <div>
-            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Content Protection</p>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">Right-click disabled, download blocked, print restricted via Secure Viewer.</p>
-          </div>
-        </div>
-        <div className="flex items-start gap-3 bg-brand-50 dark:bg-brand-500/10 rounded-xl p-4 border border-brand-200 dark:border-brand-500/20">
-          <svg className="w-5 h-5 text-brand-600 dark:text-brand-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-          </svg>
-          <div>
-            <p className="text-sm font-medium text-brand-800 dark:text-brand-300">Payment Workflow</p>
-            <p className="text-xs text-brand-600 dark:text-brand-400 mt-0.5">Students see the price → Pay via Paystack/Stripe → Document opens in Secure Viewer.</p>
-          </div>
+      {/* Security info */}
+      <div className="flex items-start gap-3 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-4 border border-emerald-200 dark:border-emerald-500/20">
+        <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+        <div>
+          <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">Content Protection</p>
+          <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">All uploaded documents (PDF, DOC, DOCX, PPT, PPTX) are protected with DRM watermarking, right-click disabled, and print restrictions via Secure Viewer.</p>
         </div>
       </div>
     </div>

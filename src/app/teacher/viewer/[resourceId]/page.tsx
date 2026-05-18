@@ -52,9 +52,14 @@ export default function ResourceViewerPage() {
   }
 
   const isPPT = resource?.fileName?.toLowerCase().endsWith('.ppt') || resource?.fileName?.toLowerCase().endsWith('.pptx');
-  const viewerUrl = isPPT 
+  const isDOC = resource?.fileName?.toLowerCase().endsWith('.doc') || resource?.fileName?.toLowerCase().endsWith('.docx');
+  const isOfficeDoc = isPPT || isDOC;
+  
+  // Route Office documents through MS Office Online Viewer for DRM protection
+  // PDFs use the native browser viewer
+  const viewerUrl = isOfficeDoc 
     ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(resource.url)}` 
-    : resource.url; // Use native browser PDF viewer for PDFs
+    : resource.url;
 
   return (
     <div className="flex flex-col h-screen bg-surface-100 dark:bg-surface-900">
@@ -91,8 +96,8 @@ export default function ResourceViewerPage() {
           title={resource.fileName}
         />
         
-        {/* Anti-copy overlay for PDFs if not PPT (since Office Viewer handles its own DRM) */}
-        {!isPPT && resource.isViewOnly && (
+        {/* Anti-copy overlay for PDFs (Office Viewer handles its own DRM for PPT/DOC) */}
+        {!isOfficeDoc && resource.isViewOnly && (
           <div className="absolute inset-0 z-20 bg-transparent" onContextMenu={(e) => e.preventDefault()} />
         )}
       </div>

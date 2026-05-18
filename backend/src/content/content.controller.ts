@@ -55,9 +55,19 @@ export class ContentController {
     @Body('price') price?: string,
     @Body('currency') currency?: string,
   ) {
-    if (!file) throw new BadRequestException('File is required');
+    if (!file) throw new BadRequestException('No file received. Please select a file to upload.');
+    if (!resourceType) throw new BadRequestException('Resource type is required (e.g. LESSON_PLAN, POWERPOINT).');
+    
     const parsedPrice = price ? parseInt(price) : 0;
-    return this.contentService.uploadResource(lessonId, file, resourceType, parsedPrice, currency || 'NGN');
+    
+    try {
+      return await this.contentService.uploadResource(lessonId, file, resourceType, parsedPrice, currency || 'NGN');
+    } catch (err: any) {
+      // Re-throw NestJS exceptions as-is
+      if (err.status) throw err;
+      // Wrap unknown errors with context
+      throw new BadRequestException(`Upload failed: ${err.message || 'Unknown server error'}`);
+    }
   }
 
   /**

@@ -8,10 +8,12 @@ async function bootstrap() {
   const config = app.get(ConfigService);
 
   // Global validation pipe with transform
+  // Note: whitelist/forbidNonWhitelisted only applies to DTO-validated routes.
+  // For multipart FormData uploads, raw @Body() fields bypass DTOs.
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Don't reject unknown fields — they're needed for FormData uploads
       transform: true,
       transformOptions: { enableImplicitConversion: true },
     }),

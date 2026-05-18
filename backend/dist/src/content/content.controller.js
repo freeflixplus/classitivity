@@ -27,9 +27,18 @@ let ContentController = class ContentController {
     }
     async uploadResource(lessonId, file, resourceType, price, currency) {
         if (!file)
-            throw new common_1.BadRequestException('File is required');
+            throw new common_1.BadRequestException('No file received. Please select a file to upload.');
+        if (!resourceType)
+            throw new common_1.BadRequestException('Resource type is required (e.g. LESSON_PLAN, POWERPOINT).');
         const parsedPrice = price ? parseInt(price) : 0;
-        return this.contentService.uploadResource(lessonId, file, resourceType, parsedPrice, currency || 'NGN');
+        try {
+            return await this.contentService.uploadResource(lessonId, file, resourceType, parsedPrice, currency || 'NGN');
+        }
+        catch (err) {
+            if (err.status)
+                throw err;
+            throw new common_1.BadRequestException(`Upload failed: ${err.message || 'Unknown server error'}`);
+        }
     }
     async createLesson(dto) {
         return this.contentService.createLesson(dto);

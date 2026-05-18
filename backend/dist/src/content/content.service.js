@@ -24,53 +24,81 @@ let ContentService = ContentService_1 = class ContentService {
         this.storage = storage;
     }
     async uploadResource(lessonId, file, resourceTypeStr, price = 0, currency = 'NGN') {
+        this.logger.log(`Upload request: lessonId=${lessonId}, type=${resourceTypeStr}, file=${file.originalname}, size=${file.size}`);
         const lesson = await this.prisma.lesson.findUnique({
             where: { id: lessonId },
             include: { subject: true },
         });
-        if (!lesson)
-            throw new common_1.NotFoundException('Lesson not found');
+        if (!lesson) {
+            this.logger.error(`Lesson not found: ${lessonId}`);
+            throw new common_1.NotFoundException(`Lesson not found with ID: ${lessonId}`);
+        }
         const resourceType = resourceTypeStr.toUpperCase();
         if (!Object.values(client_1.ResourceType).includes(resourceType)) {
-            throw new common_1.BadRequestException(`Invalid resource type: ${resourceTypeStr}`);
+            throw new common_1.BadRequestException(`Invalid resource type: ${resourceTypeStr}. Valid types: ${Object.values(client_1.ResourceType).join(', ')}`);
         }
         const existing = await this.prisma.resource.findUnique({
             where: { lessonId_type: { lessonId, type: resourceType } },
         });
         const ext = file.originalname.split('.').pop() || 'pdf';
-        const r2Key = this.storage.buildKey(lesson.subject.curriculumVersion, lesson.gradeLevel, lesson.subject.code, lesson.term, lesson.week, resourceType.toLowerCase(), ext);
-        await this.storage.uploadFile(r2Key, file.buffer, file.mimetype);
+        const r2Key = `content/${lesson.subject.curriculumVersion}/${lesson.gradeLevel}/${lesson.subject.code}/term-${lesson.term}/week-${lesson.week}/${resourceType.toLowerCase()}_${Date.now()}.${ext}`;
+        this.logger.log(`Storage key: ${r2Key}`);
         if (existing) {
-            await this.storage.deleteFile(existing.r2Key);
-            const resource = await this.prisma.resource.update({
-                where: { id: existing.id },
-                data: {
-                    fileName: file.originalname,
-                    fileSize: file.size,
-                    mimeType: file.mimetype,
-                    r2Key,
-                    price,
-                    currency,
-                },
-            });
-            this.logger.log(`Replaced resource: ${resourceType} for lesson ${lessonId}`);
-            return resource;
+            try {
+                await this.storage.deleteFile(existing.r2Key);
+                this.logger.log(`Deleted old file: ${existing.r2Key}`);
+            }
+            catch (delErr) {
+                this.logger.warn(`Failed to delete old file (non-fatal): ${delErr.message}`);
+            }
         }
-        else {
-            const resource = await this.prisma.resource.create({
-                data: {
-                    lessonId,
-                    type: resourceType,
-                    fileName: file.originalname,
-                    fileSize: file.size,
-                    mimeType: file.mimetype,
-                    r2Key,
-                    price,
-                    currency,
-                },
-            });
-            this.logger.log(`Created resource: ${resourceType} for lesson ${lessonId}`);
-            return resource;
+        try {
+            await this.storage.uploadFile(r2Key, file.buffer, file.mimetype);
+        }
+        catch (uploadErr) {
+            this.logger.error(`Storage upload failed: ${uploadErr.message}`);
+            throw new common_1.BadRequestException(`File storage failed: ${uploadErr.message}`);
+        }
+        try {
+            if (existing) {
+                const resource = await this.prisma.resource.update({
+                    where: { id: existing.id },
+                    data: {
+                        fileName: file.originalname,
+                        fileSize: file.size,
+                        mimeType: file.mimetype,
+                        r2Key,
+                        price,
+                        currency,
+                    },
+                });
+                this.logger.log(`Replaced resource: ${resourceType} for lesson ${lessonId}`);
+                return resource;
+            }
+            else {
+                const resource = await this.prisma.resource.create({
+                    data: {
+                        lessonId,
+                        type: resourceType,
+                        fileName: file.originalname,
+                        fileSize: file.size,
+                        mimeType: file.mimetype,
+                        r2Key,
+                        price,
+                        currency,
+                    },
+                });
+                this.logger.log(`Created resource: ${resourceType} for lesson ${lessonId}`);
+                return resource;
+            }
+        }
+        catch (dbErr) {
+            this.logger.error(`Database error: ${dbErr.message}`);
+            try {
+                await this.storage.deleteFile(r2Key);
+            }
+            catch { }
+            throw new common_1.BadRequestException(`Database error: ${dbErr.message}`);
         }
     }
     async createLesson(dto) {

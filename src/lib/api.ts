@@ -139,7 +139,7 @@ export const teacher = {
       auth: true,
     }),
 
-  getClassesOverview: () =>
+  getClasses: () =>
     request<any>('/api/teachers/classes', {
       method: 'GET',
       auth: true,
@@ -147,6 +147,12 @@ export const teacher = {
 
   getLessons: (grade: string, subject: string) =>
     request<any>(`/api/teachers/classes/${grade}/${subject}`, {
+      method: 'GET',
+      auth: true,
+    }),
+
+  getResourceUrl: (resourceId: string) =>
+    request<{ url: string; type: string; fileName: string; isDownloadable: boolean; isViewOnly: boolean }>(`/api/teachers/resources/${resourceId}/url`, {
       method: 'GET',
       auth: true,
     }),

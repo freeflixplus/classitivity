@@ -1,100 +1,181 @@
 "use client";
-import React, { useState } from "react";
-import { Card, Badge, Button, SecureViewer } from "@/components/ui";
+import React, { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Card, Badge, Button } from "@/components/ui";
+import { teacher } from "@/lib/api";
 
-interface Resource {
-  id: string;
-  title: string;
-  type: "pptx" | "pdf" | "docx";
-  url: string;
+const resourceTypeLabels: Record<string, string> = {
+  LESSON_PLAN: "Lesson Plan",
+  POWERPOINT: "PowerPoint Slides",
+  STUDENT_NOTES: "Student Notes",
+  OBJECTIVE_QUESTIONS: "Objective Questions",
+  THEORY_QUESTIONS: "Theory Questions",
+  LESSON_OBJECTIVES: "Lesson Objectives",
+};
+
+const resourceTypeIcons: Record<string, string> = {
+  LESSON_PLAN: "📄",
+  POWERPOINT: "📊",
+  STUDENT_NOTES: "📝",
+  OBJECTIVE_QUESTIONS: "✅",
+  THEORY_QUESTIONS: "📋",
+  LESSON_OBJECTIVES: "🎯",
+};
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1048576).toFixed(1)} MB`;
 }
 
-const mockLessons = [
-  {
-    week: 1,
-    title: "Introduction to Algebraic Expressions",
-    resources: [
-      { id: "1", title: "Lesson Slides", type: "pptx" as const, url: "https://www.learningcontainer.com/wp-content/uploads/2019/09/sample-pptx-file.pptx" },
-      { id: "2", title: "Teacher's Guide", type: "pdf" as const, url: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf" },
-    ]
-  },
-  {
-    week: 2,
-    title: "Solving Linear Equations",
-    resources: [
-      { id: "3", title: "Interactive Presentation", type: "pptx" as const, url: "https://www.learningcontainer.com/wp-content/uploads/2019/09/sample-pptx-file.pptx" },
-      { id: "4", title: "Student Handout", type: "docx" as const, url: "https://www.learningcontainer.com/wp-content/uploads/2019/09/sample-docx-file-for-testing.docx" },
-    ]
-  }
-];
+export default function SubjectLessonsPage() {
+  const params = useParams();
+  const grade = (params.grade as string)?.toUpperCase();
+  const subject = (params.subject as string)?.toUpperCase();
 
-export default function SubjectDetails({ params }: { params: Promise<{ grade: string, subject: string }> }) {
-  const resolvedParams = React.use(params);
-  const gradeStr = resolvedParams.grade.toUpperCase();
-  const subjectStr = resolvedParams.subject.toUpperCase();
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [downloading, setDownloading] = useState<string | null>(null);
 
-  const [activeDoc, setActiveDoc] = useState<Resource | null>(null);
+  useEffect(() => {
+    if (!grade || !subject) return;
+    teacher.getLessons(grade, subject)
+      .then(setData)
+      .catch((err) => setError(err.message || "Failed to load lessons"))
+      .finally(() => setLoading(false));
+  }, [grade, subject]);
 
-  const getIconColor = (type: string) => {
-    if (type === "pptx") return "bg-orange-50 text-orange-600 dark:bg-orange-500/20 dark:text-orange-400";
-    if (type === "pdf") return "bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-400";
-    return "bg-blue-50 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400";
+  const handleDownload = async (resourceId: string, fileName: string) => {
+    setDownloading(resourceId);
+    try {
+      const res = await teacher.getResourceUrl(resourceId);
+      // Open the signed URL — browser will download or preview the file
+      const link = document.createElement("a");
+      link.href = res.url;
+      link.target = "_blank";
+      link.download = fileName;
+      link.rel = "noopener noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err: any) {
+      alert(err.message || "Failed to generate download link. Your subscription may not cover this grade.");
+    } finally {
+      setDownloading(null);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Link href="/teacher/classes" className="text-brand-500 hover:text-brand-600 text-sm font-medium">← Back to Classes</Link>
+        <Card padding="lg" className="text-center">
+          <div className="text-5xl mb-4">🔒</div>
+          <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-2">Access Restricted</h3>
+          <p className="text-surface-500 dark:text-surface-400">{error}</p>
+          <p className="text-surface-400 dark:text-surface-500 text-sm mt-2">Your school may need an active subscription for {grade} to access these materials.</p>
+        </Card>
+      </div>
+    );
+  }
+
+  const lessons = data?.lessons || [];
+  const subjectInfo = data?.subject || { code: subject, name: subject };
+
+  // Group lessons by term
+  const terms = [1, 2, 3];
+  const lessonsByTerm = terms.map((term) => ({
+    term,
+    lessons: lessons.filter((l: any) => l.term === term),
+  }));
 
   return (
     <div className="space-y-8">
-      {/* Viewer Overlay */}
-      {activeDoc && (
-        <SecureViewer 
-          url={activeDoc.url}
-          title={activeDoc.title}
-          fileType={activeDoc.type}
-          onClose={() => setActiveDoc(null)}
-        />
-      )}
-
+      {/* Header */}
       <div>
-        <Link href={`/teacher/classes/${resolvedParams.grade}`} className="text-brand-500 hover:text-brand-600 text-sm font-medium mb-2 inline-flex items-center gap-1">
-          ← Back to {gradeStr}
-        </Link>
+        <Link href="/teacher/classes" className="text-brand-500 hover:text-brand-600 text-sm font-medium mb-3 inline-block">← Back to Classes</Link>
         <div className="flex items-center gap-3">
-          <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">{gradeStr} {subjectStr}</h1>
-          <Badge variant="success">Term 1</Badge>
+          <div className="w-12 h-12 rounded-2xl bg-brand-500 text-white flex items-center justify-center text-xl">📚</div>
+          <div>
+            <h1 className="font-display text-2xl font-bold text-surface-900 dark:text-white">{subjectInfo.name}</h1>
+            <p className="text-surface-500 dark:text-surface-400 text-sm">{grade} · {lessons.length} lessons available</p>
+          </div>
         </div>
-        <p className="text-surface-500 dark:text-surface-400 text-sm mt-1">Lesson plans and secure DRM resources for this subject.</p>
       </div>
 
-      <div className="space-y-4">
-        {mockLessons.map((lesson) => (
-          <Card key={lesson.week} padding="md">
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <p className="text-xs font-bold text-brand-500 uppercase tracking-wider mb-1">Week {lesson.week}</p>
-                <h3 className="text-lg font-semibold text-surface-900 dark:text-white">{lesson.title}</h3>
-              </div>
-            </div>
+      {/* Lessons by term */}
+      {lessonsByTerm.map(({ term, lessons: termLessons }) => (
+        <div key={term}>
+          <h2 className="text-lg font-semibold text-surface-900 dark:text-white mb-4 flex items-center gap-2">
+            <Badge variant="brand">Term {term}</Badge>
+            <span className="text-surface-400 text-sm font-normal">{termLessons.length} lessons</span>
+          </h2>
 
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {lesson.resources.map((res) => (
-                <button
-                  key={res.id}
-                  onClick={() => setActiveDoc(res)}
-                  className="flex items-center gap-3 p-3 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 hover:border-brand-300 hover:bg-brand-50 dark:hover:border-brand-500/30 dark:hover:bg-brand-500/10 transition-all text-left"
-                >
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xs uppercase ${getIconColor(res.type)}`}>
-                    {res.type}
+          {termLessons.length === 0 ? (
+            <Card padding="md" className="text-center">
+              <p className="text-surface-400 dark:text-surface-500 text-sm">No published lessons for Term {term} yet.</p>
+            </Card>
+          ) : (
+            <div className="space-y-3">
+              {termLessons.map((lesson: any) => (
+                <Card key={lesson.id} padding="md" className="animate-fade-in-up">
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold text-surface-900 dark:text-white">{lesson.title}</h3>
+                      <p className="text-xs text-surface-500 dark:text-surface-400">Week {lesson.week}</p>
+                    </div>
+                    <Badge variant="default">{lesson.resources.length} resource{lesson.resources.length !== 1 ? "s" : ""}</Badge>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-surface-900 dark:text-white truncate">{res.title}</p>
-                    <p className="text-xs text-surface-500 dark:text-surface-400 truncate">Read Only</p>
-                  </div>
-                </button>
+
+                  {lesson.resources.length > 0 ? (
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                      {lesson.resources.map((res: any) => (
+                        <button
+                          key={res.id}
+                          onClick={() => handleDownload(res.id, res.title || res.fileName || "download")}
+                          disabled={downloading === res.id}
+                          className="flex items-center gap-3 p-3 rounded-xl bg-surface-50 dark:bg-surface-800 hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors text-left group disabled:opacity-50"
+                        >
+                          <span className="text-2xl">{resourceTypeIcons[res.type] || "📄"}</span>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-surface-800 dark:text-white truncate">{resourceTypeLabels[res.type] || res.type}</p>
+                            <p className="text-xs text-surface-400">{formatFileSize(res.fileSize)}</p>
+                          </div>
+                          {downloading === res.id ? (
+                            <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-5 h-5 text-surface-400 group-hover:text-brand-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-surface-400 dark:text-surface-500 italic">No resources uploaded for this lesson yet.</p>
+                  )}
+                </Card>
               ))}
             </div>
-          </Card>
-        ))}
-      </div>
+          )}
+        </div>
+      ))}
+
+      {lessons.length === 0 && (
+        <Card padding="lg" className="text-center">
+          <div className="text-5xl mb-4">📭</div>
+          <h3 className="text-lg font-semibold text-surface-900 dark:text-white mb-2">No Lessons Yet</h3>
+          <p className="text-surface-500 dark:text-surface-400">Materials for {subjectInfo.name} in {grade} haven&apos;t been uploaded yet. Check back soon!</p>
+        </Card>
+      )}
     </div>
   );
 }

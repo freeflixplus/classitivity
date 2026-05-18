@@ -13,51 +13,74 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.StorageService = void 0;
 const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
-const client_s3_1 = require("@aws-sdk/client-s3");
-const s3_request_presigner_1 = require("@aws-sdk/s3-request-presigner");
+const supabase_js_1 = require("@supabase/supabase-js");
 let StorageService = StorageService_1 = class StorageService {
     config;
-    s3;
+    supabase;
     bucket;
     logger = new common_1.Logger(StorageService_1.name);
     constructor(config) {
         this.config = config;
-        this.bucket = config.get('R2_BUCKET_NAME', 'classitivity-content');
-        this.s3 = new client_s3_1.S3Client({
-            region: 'auto',
-            endpoint: `https://${config.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
-            credentials: {
-                accessKeyId: config.get('R2_ACCESS_KEY_ID', ''),
-                secretAccessKey: config.get('R2_SECRET_ACCESS_KEY', ''),
-            },
+        this.bucket = config.get('SUPABASE_STORAGE_BUCKET', 'content');
+        const supabaseUrl = config.get('SUPABASE_URL', '');
+        const supabaseServiceKey = config.get('SUPABASE_SERVICE_KEY', '');
+        if (!supabaseUrl || !supabaseServiceKey) {
+            this.logger.warn('Supabase Storage credentials not configured — file operations will fail');
+        }
+        this.supabase = (0, supabase_js_1.createClient)(supabaseUrl, supabaseServiceKey, {
+            auth: { persistSession: false },
         });
     }
+    async ensureBucket() {
+        const { data } = await this.supabase.storage.getBucket(this.bucket);
+        if (!data) {
+            const { error } = await this.supabase.storage.createBucket(this.bucket, {
+                public: false,
+                fileSizeLimit: 52428800,
+            });
+            if (error) {
+                this.logger.error(`Failed to create bucket "${this.bucket}": ${error.message}`);
+            }
+            else {
+                this.logger.log(`Created storage bucket: ${this.bucket}`);
+            }
+        }
+    }
     async uploadFile(key, body, mimeType) {
-        const command = new client_s3_1.PutObjectCommand({
-            Bucket: this.bucket,
-            Key: key,
-            Body: body,
-            ContentType: mimeType,
+        await this.ensureBucket();
+        const { error } = await this.supabase.storage
+            .from(this.bucket)
+            .upload(key, body, {
+            contentType: mimeType,
+            upsert: true,
         });
-        await this.s3.send(command);
+        if (error) {
+            this.logger.error(`Upload failed for ${key}: ${error.message}`);
+            throw new Error(`Upload failed: ${error.message}`);
+        }
         this.logger.log(`Uploaded: ${key} (${body.length} bytes)`);
         return { key, size: body.length };
     }
     async getPresignedUrl(key, expiresInSeconds = 3600) {
-        const command = new client_s3_1.GetObjectCommand({
-            Bucket: this.bucket,
-            Key: key,
-        });
-        const url = await (0, s3_request_presigner_1.getSignedUrl)(this.s3, command, { expiresIn: expiresInSeconds });
-        return url;
+        const { data, error } = await this.supabase.storage
+            .from(this.bucket)
+            .createSignedUrl(key, expiresInSeconds);
+        if (error || !data?.signedUrl) {
+            this.logger.error(`Failed to create signed URL for ${key}: ${error?.message}`);
+            throw new Error(`Cannot generate download URL: ${error?.message || 'Unknown error'}`);
+        }
+        return data.signedUrl;
     }
     async deleteFile(key) {
-        const command = new client_s3_1.DeleteObjectCommand({
-            Bucket: this.bucket,
-            Key: key,
-        });
-        await this.s3.send(command);
-        this.logger.log(`Deleted: ${key}`);
+        const { error } = await this.supabase.storage
+            .from(this.bucket)
+            .remove([key]);
+        if (error) {
+            this.logger.error(`Delete failed for ${key}: ${error.message}`);
+        }
+        else {
+            this.logger.log(`Deleted: ${key}`);
+        }
     }
     buildKey(version, grade, subject, term, week, resourceType, extension) {
         return `content/${version}/${grade}/${subject}/term-${term}/week-${week}/${resourceType}.${extension}`;

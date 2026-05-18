@@ -59,13 +59,13 @@ export declare class SchoolAdminController {
         id: string;
         schoolId: string;
         createdAt: Date;
-        metadata: import("@prisma/client/runtime/client").JsonValue | null;
         status: import("@prisma/client").$Enums.PaymentStatus;
         currency: string;
         gateway: import("@prisma/client").$Enums.PaymentGateway;
         subscriptionId: string;
         amount: number;
         gatewayRef: string | null;
+        metadata: import("@prisma/client/runtime/client").JsonValue | null;
         paidAt: Date | null;
     })[]>;
 }

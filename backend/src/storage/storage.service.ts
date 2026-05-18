@@ -1,83 +1,106 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-  DeleteObjectCommand,
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 @Injectable()
 export class StorageService {
-  private readonly s3: S3Client;
+  private readonly supabase: SupabaseClient;
   private readonly bucket: string;
   private readonly logger = new Logger(StorageService.name);
 
   constructor(private config: ConfigService) {
-    this.bucket = config.get('R2_BUCKET_NAME', 'classitivity-content');
+    this.bucket = config.get('SUPABASE_STORAGE_BUCKET', 'content');
 
-    this.s3 = new S3Client({
-      region: 'auto',
-      endpoint: `https://${config.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: config.get('R2_ACCESS_KEY_ID', ''),
-        secretAccessKey: config.get('R2_SECRET_ACCESS_KEY', ''),
-      },
+    const supabaseUrl = config.get('SUPABASE_URL', '');
+    const supabaseServiceKey = config.get('SUPABASE_SERVICE_KEY', '');
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      this.logger.warn('Supabase Storage credentials not configured — file operations will fail');
+    }
+
+    this.supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { persistSession: false },
     });
   }
 
   /**
-   * Upload a file to Cloudflare R2
-   * Key format: classitivity/{version}/{grade}/{subject}/{term}/{lesson}/{type}.{ext}
+   * Ensure the storage bucket exists (called on first upload)
+   */
+  private async ensureBucket() {
+    const { data } = await this.supabase.storage.getBucket(this.bucket);
+    if (!data) {
+      const { error } = await this.supabase.storage.createBucket(this.bucket, {
+        public: false,
+        fileSizeLimit: 52428800, // 50MB
+      });
+      if (error) {
+        this.logger.error(`Failed to create bucket "${this.bucket}": ${error.message}`);
+      } else {
+        this.logger.log(`Created storage bucket: ${this.bucket}`);
+      }
+    }
+  }
+
+  /**
+   * Upload a file to Supabase Storage
+   * Key format: content/{version}/{grade}/{subject}/term-{N}/week-{N}/{type}.{ext}
    */
   async uploadFile(
     key: string,
     body: Buffer,
     mimeType: string,
   ): Promise<{ key: string; size: number }> {
-    const command = new PutObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-      Body: body,
-      ContentType: mimeType,
-    });
+    await this.ensureBucket();
 
-    await this.s3.send(command);
+    const { error } = await this.supabase.storage
+      .from(this.bucket)
+      .upload(key, body, {
+        contentType: mimeType,
+        upsert: true, // overwrite if exists
+      });
+
+    if (error) {
+      this.logger.error(`Upload failed for ${key}: ${error.message}`);
+      throw new Error(`Upload failed: ${error.message}`);
+    }
+
     this.logger.log(`Uploaded: ${key} (${body.length} bytes)`);
-
     return { key, size: body.length };
   }
 
   /**
-   * Generate a presigned URL for secure, time-limited access
-   * DRM: Raw URLs are NEVER exposed to the client
+   * Generate a signed URL for secure, time-limited access
    */
   async getPresignedUrl(key: string, expiresInSeconds = 3600): Promise<string> {
-    const command = new GetObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-    });
+    const { data, error } = await this.supabase.storage
+      .from(this.bucket)
+      .createSignedUrl(key, expiresInSeconds);
 
-    const url = await getSignedUrl(this.s3, command, { expiresIn: expiresInSeconds });
-    return url;
+    if (error || !data?.signedUrl) {
+      this.logger.error(`Failed to create signed URL for ${key}: ${error?.message}`);
+      throw new Error(`Cannot generate download URL: ${error?.message || 'Unknown error'}`);
+    }
+
+    return data.signedUrl;
   }
 
   /**
-   * Delete a file from R2
+   * Delete a file from Supabase Storage
    */
   async deleteFile(key: string): Promise<void> {
-    const command = new DeleteObjectCommand({
-      Bucket: this.bucket,
-      Key: key,
-    });
+    const { error } = await this.supabase.storage
+      .from(this.bucket)
+      .remove([key]);
 
-    await this.s3.send(command);
-    this.logger.log(`Deleted: ${key}`);
+    if (error) {
+      this.logger.error(`Delete failed for ${key}: ${error.message}`);
+    } else {
+      this.logger.log(`Deleted: ${key}`);
+    }
   }
 
   /**
-   * Build the R2 object key for a resource
+   * Build the storage object key for a resource
    */
   buildKey(
     version: string,

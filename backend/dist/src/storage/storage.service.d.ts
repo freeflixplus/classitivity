@@ -1,10 +1,11 @@
 import { ConfigService } from '@nestjs/config';
 export declare class StorageService {
     private config;
-    private readonly s3;
+    private readonly supabase;
     private readonly bucket;
     private readonly logger;
     constructor(config: ConfigService);
+    private ensureBucket;
     uploadFile(key: string, body: Buffer, mimeType: string): Promise<{
         key: string;
         size: number;

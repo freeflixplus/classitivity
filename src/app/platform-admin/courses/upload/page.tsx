@@ -37,6 +37,15 @@ export default function UploadResourcesPage() {
   const [dragActive, setDragActive] = useState(false);
   const [lessonId, setLessonId] = useState("");
   const [globalCurrency, setGlobalCurrency] = useState("NGN");
+  const [availableLessons, setAvailableLessons] = useState<any[]>([]);
+  const [loadingLessons, setLoadingLessons] = useState(true);
+
+  React.useEffect(() => {
+    platformAdmin.getLessons(1, 100)
+      .then(res => setAvailableLessons(res.data || []))
+      .catch(err => console.error("Failed to load lessons", err))
+      .finally(() => setLoadingLessons(false));
+  }, []);
 
   const addFiles = (fileList: FileList) => {
     const accepted = [
@@ -71,6 +80,11 @@ export default function UploadResourcesPage() {
   };
 
   const handleUploadAll = async () => {
+    if (!lessonId) {
+      alert("Please select a course/lesson to assign these resources to.");
+      return;
+    }
+
     const pendingFiles = files.filter((f) => f.status === "pending");
     
     for (const f of pendingFiles) {
@@ -86,7 +100,7 @@ export default function UploadResourcesPage() {
       try {
         // Upload the file via FormData (with pricing attached)
         await platformAdmin.uploadResource(
-          lessonId || "placeholder",
+          lessonId,
           f.file,
           f.resourceType,
           Math.round(parseFloat(f.price) * 100), // Convert to smallest unit
@@ -149,14 +163,22 @@ export default function UploadResourcesPage() {
             </select>
           </div>
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">Assign to Course (optional)</label>
-            <input
-              type="text"
+            <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">Assign to Course/Lesson</label>
+            <select
               value={lessonId}
               onChange={(e) => setLessonId(e.target.value)}
-              placeholder="Course ID or leave blank"
+              disabled={loadingLessons}
               className="w-full rounded-xl border border-surface-200 dark:border-surface-700 bg-white dark:bg-surface-800 px-4 py-2.5 text-sm text-surface-800 dark:text-surface-200 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400"
-            />
+            >
+              <option value="" disabled>
+                {loadingLessons ? "Loading courses..." : "Select a course/lesson..."}
+              </option>
+              {availableLessons.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.subject?.name} ({l.gradeLevel}) - Term {l.term} Week {l.week}: {l.title}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </Card>

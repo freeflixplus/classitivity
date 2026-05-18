@@ -237,6 +237,9 @@ export const platformAdmin = {
   createCourse: (data: { title: string; subjectCode: string; curriculumVersion: string; gradeLevel: string; term: number; week: number; description?: string; status?: string }) =>
     request<any>('/api/platform-admin/courses', { method: 'POST', body: JSON.stringify(data), auth: true }),
 
+  getLessons: (page = 1, limit = 50) =>
+    request<any>(`/api/admin/content/lessons?page=${page}&limit=${limit}`, { method: 'GET', auth: true }),
+
   uploadResource: (lessonId: string, file: File, resourceType: string, price: number, currency: string) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -248,7 +251,7 @@ export const platformAdmin = {
     // it automatically sets Content-Type to application/json.
     // So we make a direct fetch call for uploads.
     const token = localStorage.getItem('classitivity_access_token');
-    return fetch(`/api/admin/content/lessons/${lessonId}/resources`, {
+    return fetch(`${API_BASE}/api/admin/content/lessons/${lessonId}/resources`, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,

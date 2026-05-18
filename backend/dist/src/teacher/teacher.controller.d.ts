@@ -5,9 +5,9 @@ export declare class TeacherController {
     getDashboard(req: any): Promise<{
         assignedGrades: string[];
         subscriptions: {
+            trialEndsAt: Date | null;
             gradeLevel: string;
             status: import("@prisma/client").$Enums.SubscriptionStatus;
-            trialEndsAt: Date | null;
             currentPeriodEnd: Date | null;
         }[];
         recentActivity: {

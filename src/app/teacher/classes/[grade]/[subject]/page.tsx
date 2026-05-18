@@ -47,24 +47,13 @@ export default function SubjectLessonsPage() {
       .finally(() => setLoading(false));
   }, [grade, subject]);
 
-  const handleDownload = async (resourceId: string, fileName: string) => {
-    setDownloading(resourceId);
-    try {
-      const res = await teacher.getResourceUrl(resourceId);
-      // Open the signed URL — browser will download or preview the file
-      const link = document.createElement("a");
-      link.href = res.url;
-      link.target = "_blank";
-      link.download = fileName;
-      link.rel = "noopener noreferrer";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } catch (err: any) {
-      alert(err.message || "Failed to generate download link. Your subscription may not cover this grade.");
-    } finally {
-      setDownloading(null);
-    }
+  const handleDownload = (resourceId: string, fileName: string) => {
+    // Navigate to the secure viewer route
+    // The viewer handles both view-only (DRM) and downloadable files
+    import("next/navigation").then(({ useRouter }) => {
+       // Since this is inside a component, it's better to just use window.location or next/link
+       window.location.href = `/teacher/viewer/${resourceId}`;
+    });
   };
 
   if (loading) {

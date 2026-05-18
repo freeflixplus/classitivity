@@ -40,10 +40,10 @@ export declare class SchoolAdminController {
         schoolId: string;
         createdAt: Date;
         updatedAt: Date;
+        trialEndsAt: Date | null;
         gradeLevel: string;
         status: import("@prisma/client").$Enums.SubscriptionStatus;
         billingCycle: import("@prisma/client").$Enums.BillingCycle;
-        trialEndsAt: Date | null;
         currentPeriodStart: Date | null;
         currentPeriodEnd: Date | null;
         gatewayCustomerId: string | null;

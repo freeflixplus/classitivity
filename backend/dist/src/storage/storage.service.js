@@ -85,6 +85,16 @@ let StorageService = StorageService_1 = class StorageService {
     buildKey(version, grade, subject, term, week, resourceType, extension) {
         return `content/${version}/${grade}/${subject}/term-${term}/week-${week}/${resourceType}.${extension}`;
     }
+    async downloadFile(key) {
+        const { data, error } = await this.supabase.storage
+            .from(this.bucket)
+            .download(key);
+        if (error || !data) {
+            throw new Error(`Failed to download file: ${error?.message}`);
+        }
+        const arrayBuffer = await data.arrayBuffer();
+        return Buffer.from(arrayBuffer);
+    }
 };
 exports.StorageService = StorageService;
 exports.StorageService = StorageService = StorageService_1 = __decorate([

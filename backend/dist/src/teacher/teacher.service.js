@@ -13,12 +13,15 @@ exports.TeacherService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const storage_service_1 = require("../storage/storage.service");
+const watermark_service_1 = require("../content/watermark.service");
 let TeacherService = class TeacherService {
     prisma;
     storage;
-    constructor(prisma, storage) {
+    watermarkService;
+    constructor(prisma, storage, watermarkService) {
         this.prisma = prisma;
         this.storage = storage;
+        this.watermarkService = watermarkService;
     }
     async getDashboard(schoolId) {
         const subscriptions = await this.prisma.subscription.findMany({
@@ -112,7 +115,7 @@ let TeacherService = class TeacherService {
             })),
         };
     }
-    async getResourceUrl(resourceId, schoolId) {
+    async getResourceUrl(resourceId, schoolId, userId) {
         const resource = await this.prisma.resource.findUnique({
             where: { id: resourceId },
             include: {
@@ -136,7 +139,26 @@ let TeacherService = class TeacherService {
         }
         const isDownloadable = ['STUDENT_NOTES', 'OBJECTIVE_QUESTIONS', 'THEORY_QUESTIONS'].includes(resource.type);
         const isViewOnly = ['LESSON_PLAN', 'POWERPOINT', 'LESSON_OBJECTIVES'].includes(resource.type);
-        const url = await this.storage.getPresignedUrl(resource.r2Key, 900);
+        let finalKey = resource.r2Key;
+        if (isDownloadable && resource.fileName.toLowerCase().endsWith('.pdf')) {
+            const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+            const buffer = await this.storage.downloadFile(resource.r2Key);
+            const watermarkText = `${school?.name || 'Classitivity'} - ${new Date().toISOString().split('T')[0]}`;
+            const watermarkedBuffer = await this.watermarkService.addWatermark(buffer, watermarkText);
+            const tempKey = `watermarked/${schoolId}/${Date.now()}_${resource.fileName}`;
+            await this.storage.uploadFile(tempKey, watermarkedBuffer, 'application/pdf');
+            finalKey = tempKey;
+        }
+        const url = await this.storage.getPresignedUrl(finalKey, 900);
+        if (isDownloadable) {
+            await this.prisma.downloadLog.create({
+                data: {
+                    userId: userId,
+                    lessonResourceId: resource.id,
+                    schoolId: schoolId,
+                }
+            });
+        }
         return {
             url,
             type: resource.type,
@@ -150,6 +172,7 @@ exports.TeacherService = TeacherService;
 exports.TeacherService = TeacherService = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        storage_service_1.StorageService])
+        storage_service_1.StorageService,
+        watermark_service_1.WatermarkService])
 ], TeacherService);
 //# sourceMappingURL=teacher.service.js.map

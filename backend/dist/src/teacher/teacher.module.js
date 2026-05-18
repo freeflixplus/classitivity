@@ -12,12 +12,13 @@ const teacher_controller_1 = require("./teacher.controller");
 const teacher_service_1 = require("./teacher.service");
 const prisma_module_1 = require("../prisma/prisma.module");
 const storage_module_1 = require("../storage/storage.module");
+const content_module_1 = require("../content/content.module");
 let TeacherModule = class TeacherModule {
 };
 exports.TeacherModule = TeacherModule;
 exports.TeacherModule = TeacherModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, storage_module_1.StorageModule],
+        imports: [prisma_module_1.PrismaModule, storage_module_1.StorageModule, content_module_1.ContentModule],
         controllers: [teacher_controller_1.TeacherController],
         providers: [teacher_service_1.TeacherService],
         exports: [teacher_service_1.TeacherService],

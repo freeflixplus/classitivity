@@ -28,6 +28,7 @@ export declare class ContentService {
             updatedAt: Date;
             code: string;
             curriculumVersion: import("@prisma/client").$Enums.CurriculumVersion;
+            classId: string | null;
         };
         resources: {
             id: string;
@@ -47,13 +48,14 @@ export declare class ContentService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        term: number;
         week: number;
         gradeLevel: string;
-        term: number;
         title: string;
         description: string | null;
         status: import("@prisma/client").$Enums.ContentStatus;
         subjectId: string;
+        topicId: string | null;
     }>;
     getLessons(filters: {
         version?: string;
@@ -80,13 +82,14 @@ export declare class ContentService {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            term: number;
             week: number;
             gradeLevel: string;
-            term: number;
             title: string;
             description: string | null;
             status: import("@prisma/client").$Enums.ContentStatus;
             subjectId: string;
+            topicId: string | null;
         })[];
         pagination: {
             page: number;
@@ -103,6 +106,7 @@ export declare class ContentService {
             updatedAt: Date;
             code: string;
             curriculumVersion: import("@prisma/client").$Enums.CurriculumVersion;
+            classId: string | null;
         };
         resources: {
             id: string;
@@ -122,13 +126,14 @@ export declare class ContentService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        term: number;
         week: number;
         gradeLevel: string;
-        term: number;
         title: string;
         description: string | null;
         status: import("@prisma/client").$Enums.ContentStatus;
         subjectId: string;
+        topicId: string | null;
     }>;
     updateLessonStatus(id: string, status: string): Promise<{
         subject: {
@@ -138,6 +143,7 @@ export declare class ContentService {
             updatedAt: Date;
             code: string;
             curriculumVersion: import("@prisma/client").$Enums.CurriculumVersion;
+            classId: string | null;
         };
         resources: {
             id: string;
@@ -157,15 +163,69 @@ export declare class ContentService {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        term: number;
         week: number;
         gradeLevel: string;
-        term: number;
         title: string;
         description: string | null;
         status: import("@prisma/client").$Enums.ContentStatus;
         subjectId: string;
+        topicId: string | null;
     }>;
     deleteResource(id: string): Promise<{
         message: string;
+    }>;
+    getContentTree(version: string): Promise<({
+        subjects: ({
+            terms: ({
+                topics: ({
+                    lessons: {
+                        id: string;
+                        createdAt: Date;
+                        updatedAt: Date;
+                        term: number;
+                        week: number;
+                        gradeLevel: string;
+                        title: string;
+                        description: string | null;
+                        status: import("@prisma/client").$Enums.ContentStatus;
+                        subjectId: string;
+                        topicId: string | null;
+                    }[];
+                } & {
+                    id: string;
+                    title: string;
+                    weekNumber: number;
+                    termId: string;
+                    lessonNumber: number;
+                })[];
+            } & {
+                id: string;
+                subjectId: string;
+                label: string;
+                orderIndex: number;
+            })[];
+        } & {
+            id: string;
+            name: string;
+            createdAt: Date;
+            updatedAt: Date;
+            code: string;
+            curriculumVersion: import("@prisma/client").$Enums.CurriculumVersion;
+            classId: string | null;
+        })[];
+    } & {
+        id: string;
+        curriculumVersion: import("@prisma/client").$Enums.CurriculumVersion;
+        gradeLabel: string;
+        gradeCode: string;
+    })[]>;
+    createSchemeOfWork(dto: any): Promise<{
+        id: string;
+        subjectId: string;
+        topicId: string;
+        weekNumber: number;
+        lessonCount: number;
+        termId: string;
     }>;
 }

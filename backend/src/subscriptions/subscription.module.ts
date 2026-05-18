@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
-import { SubscriptionController } from './subscription.controller';
 import { SubscriptionService } from './subscription.service';
+import { WebhookController } from './webhook.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [SubscriptionController],
+  controllers: [WebhookController],
   providers: [SubscriptionService],
   exports: [SubscriptionService],
 })

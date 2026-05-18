@@ -58,8 +58,8 @@ export declare class CurriculumController {
         subjectCode: string;
         lessons: {
             id: string;
-            week: number;
             term: number;
+            week: number;
             title: string;
             description: string | null;
             resources: {

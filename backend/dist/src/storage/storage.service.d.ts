@@ -13,4 +13,5 @@ export declare class StorageService {
     getPresignedUrl(key: string, expiresInSeconds?: number): Promise<string>;
     deleteFile(key: string): Promise<void>;
     buildKey(version: string, grade: string, subject: string, term: number, week: number, resourceType: string, extension: string): string;
+    downloadFile(key: string): Promise<Buffer>;
 }

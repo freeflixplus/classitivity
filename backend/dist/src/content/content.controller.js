@@ -54,6 +54,12 @@ let ContentController = class ContentController {
     async deleteResource(id) {
         return this.contentService.deleteResource(id);
     }
+    async getContentTree(version) {
+        return this.contentService.getContentTree(version);
+    }
+    async createSchemeOfWork(dto) {
+        return this.contentService.createSchemeOfWork(dto);
+    }
 };
 exports.ContentController = ContentController;
 __decorate([
@@ -121,6 +127,20 @@ __decorate([
     __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], ContentController.prototype, "deleteResource", null);
+__decorate([
+    (0, common_1.Get)('content-tree/:version'),
+    __param(0, (0, common_1.Param)('version')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], ContentController.prototype, "getContentTree", null);
+__decorate([
+    (0, common_1.Post)('scheme-of-work'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], ContentController.prototype, "createSchemeOfWork", null);
 exports.ContentController = ContentController = __decorate([
     (0, common_1.Controller)('admin/content'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),

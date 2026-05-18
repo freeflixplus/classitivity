@@ -26,7 +26,9 @@ export declare class PlatformAdminController {
             country: string;
             phone: string | null;
             slug: string;
+            address: string | null;
             logoUrl: string | null;
+            trialEndsAt: Date | null;
         })[];
         pagination: {
             page: number;
@@ -53,7 +55,9 @@ export declare class PlatformAdminController {
             country: string;
             phone: string | null;
             slug: string;
+            address: string | null;
             logoUrl: string | null;
+            trialEndsAt: Date | null;
         };
         message: string;
     }>;
@@ -71,7 +75,9 @@ export declare class PlatformAdminController {
             country: string;
             phone: string | null;
             slug: string;
+            address: string | null;
             logoUrl: string | null;
+            trialEndsAt: Date | null;
         };
         message: string;
     }>;
@@ -84,6 +90,7 @@ export declare class PlatformAdminController {
                 updatedAt: Date;
                 code: string;
                 curriculumVersion: import("@prisma/client").$Enums.CurriculumVersion;
+                classId: string | null;
             };
             _count: {
                 resources: number;
@@ -92,13 +99,14 @@ export declare class PlatformAdminController {
             id: string;
             createdAt: Date;
             updatedAt: Date;
+            term: number;
             week: number;
             gradeLevel: string;
-            term: number;
             title: string;
             description: string | null;
             status: import("@prisma/client").$Enums.ContentStatus;
             subjectId: string;
+            topicId: string | null;
         })[];
         pagination: {
             page: number;
@@ -124,18 +132,20 @@ export declare class PlatformAdminController {
             updatedAt: Date;
             code: string;
             curriculumVersion: import("@prisma/client").$Enums.CurriculumVersion;
+            classId: string | null;
         };
     } & {
         id: string;
         createdAt: Date;
         updatedAt: Date;
+        term: number;
         week: number;
         gradeLevel: string;
-        term: number;
         title: string;
         description: string | null;
         status: import("@prisma/client").$Enums.ContentStatus;
         subjectId: string;
+        topicId: string | null;
     }>;
     createResource(data: {
         lessonId: string;

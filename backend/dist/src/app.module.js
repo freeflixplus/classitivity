@@ -17,9 +17,9 @@ const storage_module_1 = require("./storage/storage.module");
 const teacher_module_1 = require("./teacher/teacher.module");
 const school_admin_module_1 = require("./school-admin/school-admin.module");
 const platform_admin_module_1 = require("./platform-admin/platform-admin.module");
-const subscription_module_1 = require("./subscription/subscription.module");
-const webhook_module_1 = require("./webhook/webhook.module");
+const subscription_module_1 = require("./subscriptions/subscription.module");
 const curriculum_module_1 = require("./curriculum/curriculum.module");
+const schedule_1 = require("@nestjs/schedule");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -42,8 +42,8 @@ exports.AppModule = AppModule = __decorate([
             school_admin_module_1.SchoolAdminModule,
             platform_admin_module_1.PlatformAdminModule,
             subscription_module_1.SubscriptionModule,
-            webhook_module_1.WebhookModule,
             curriculum_module_1.CurriculumModule,
+            schedule_1.ScheduleModule.forRoot(),
         ],
     })
 ], AppModule);

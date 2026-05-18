@@ -9,50 +9,32 @@ var WatermarkService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WatermarkService = void 0;
 const common_1 = require("@nestjs/common");
+const pdf_lib_1 = require("pdf-lib");
 let WatermarkService = WatermarkService_1 = class WatermarkService {
     logger = new common_1.Logger(WatermarkService_1.name);
-    async watermarkPdf(pdfBuffer, schoolName, subscriptionTier = 'Standard') {
+    async addWatermark(pdfBuffer, watermarkText) {
         try {
-            const { PDFDocument, rgb, degrees, StandardFonts } = require('pdf-lib');
-            const pdfDoc = await PDFDocument.load(pdfBuffer);
-            const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-            const now = new Date();
-            const dateStr = now.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-            });
-            const watermarkText = `${schoolName} | ${subscriptionTier} | ${dateStr}`;
+            const pdfDoc = await pdf_lib_1.PDFDocument.load(pdfBuffer);
             const pages = pdfDoc.getPages();
-            for (const page of pages) {
+            const font = await pdfDoc.embedFont(pdf_lib_1.StandardFonts.HelveticaBold);
+            pages.forEach((page) => {
                 const { width, height } = page.getSize();
-                const fontSize = 14;
-                const textWidth = helvetica.widthOfTextAtSize(watermarkText, fontSize);
                 page.drawText(watermarkText, {
-                    x: (width - textWidth) / 2,
+                    x: width / 2 - 150,
                     y: height / 2,
-                    size: fontSize,
-                    font: helvetica,
-                    color: rgb(0.85, 0.85, 0.85),
-                    rotate: degrees(45),
+                    size: 40,
+                    font,
+                    color: (0, pdf_lib_1.rgb)(0.8, 0.8, 0.8),
+                    rotate: (0, pdf_lib_1.degrees)(-45),
                     opacity: 0.3,
                 });
-                page.drawText(watermarkText, {
-                    x: 20,
-                    y: 15,
-                    size: 8,
-                    font: helvetica,
-                    color: rgb(0.7, 0.7, 0.7),
-                    opacity: 0.5,
-                });
-            }
+            });
             const watermarkedBytes = await pdfDoc.save();
-            this.logger.log(`Watermarked PDF for "${schoolName}" (${pages.length} pages)`);
             return Buffer.from(watermarkedBytes);
         }
         catch (error) {
-            this.logger.error(`Watermarking failed: ${error.message}`);
-            return pdfBuffer;
+            this.logger.error('Failed to watermark PDF', error);
+            throw new Error('Watermarking failed');
         }
     }
 };

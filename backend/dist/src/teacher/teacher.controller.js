@@ -36,7 +36,7 @@ let TeacherController = class TeacherController {
         return this.teacherService.getLessons(req.user.schoolId, req.user.curriculumVersion, grade.toUpperCase(), subject.toUpperCase());
     }
     getResourceUrl(req, id) {
-        return this.teacherService.getResourceUrl(id, req.user.schoolId);
+        return this.teacherService.getResourceUrl(id, req.user.schoolId, req.user.id);
     }
 };
 exports.TeacherController = TeacherController;

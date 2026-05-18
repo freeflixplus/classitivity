@@ -8,9 +8,9 @@ import { StorageModule } from './storage/storage.module';
 import { TeacherModule } from './teacher/teacher.module';
 import { SchoolAdminModule } from './school-admin/school-admin.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
-import { SubscriptionModule } from './subscription/subscription.module';
-import { WebhookModule } from './webhook/webhook.module';
+import { SubscriptionModule } from './subscriptions/subscription.module';
 import { CurriculumModule } from './curriculum/curriculum.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -34,8 +34,8 @@ import { CurriculumModule } from './curriculum/curriculum.module';
     SchoolAdminModule,
     PlatformAdminModule,
     SubscriptionModule,
-    WebhookModule,
     CurriculumModule,
+    ScheduleModule.forRoot(),
   ],
 })
 export class AppModule {}

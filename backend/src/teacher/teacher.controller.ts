@@ -40,7 +40,7 @@ export class TeacherController {
 
   @Get('resources/:id/url')
   getResourceUrl(@Request() req: any, @Param('id') id: string) {
-    return this.teacherService.getResourceUrl(id, req.user.schoolId);
+    return this.teacherService.getResourceUrl(id, req.user.schoolId, req.user.id);
   }
 }
 

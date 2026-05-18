@@ -166,6 +166,37 @@ let ContentService = ContentService_1 = class ContentService {
         await this.prisma.resource.delete({ where: { id } });
         return { message: 'Resource deleted successfully' };
     }
+    async getContentTree(version) {
+        return this.prisma.class.findMany({
+            where: { curriculumVersion: version.toUpperCase() },
+            include: {
+                subjects: {
+                    include: {
+                        terms: {
+                            include: {
+                                topics: {
+                                    include: {
+                                        lessons: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    async createSchemeOfWork(dto) {
+        return this.prisma.schemeOfWork.create({
+            data: {
+                subjectId: dto.subjectId,
+                topicId: dto.topicId,
+                termId: dto.termId,
+                weekNumber: dto.weekNumber,
+                lessonCount: dto.lessonCount,
+            }
+        });
+    }
 };
 exports.ContentService = ContentService;
 exports.ContentService = ContentService = ContentService_1 = __decorate([

@@ -6,18 +6,20 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.WebhookModule = void 0;
+exports.SubscriptionModule = void 0;
 const common_1 = require("@nestjs/common");
+const subscription_service_1 = require("./subscription.service");
 const webhook_controller_1 = require("./webhook.controller");
 const prisma_module_1 = require("../prisma/prisma.module");
-const subscription_module_1 = require("../subscription/subscription.module");
-let WebhookModule = class WebhookModule {
+let SubscriptionModule = class SubscriptionModule {
 };
-exports.WebhookModule = WebhookModule;
-exports.WebhookModule = WebhookModule = __decorate([
+exports.SubscriptionModule = SubscriptionModule;
+exports.SubscriptionModule = SubscriptionModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule, subscription_module_1.SubscriptionModule],
+        imports: [prisma_module_1.PrismaModule],
         controllers: [webhook_controller_1.WebhookController],
+        providers: [subscription_service_1.SubscriptionService],
+        exports: [subscription_service_1.SubscriptionService],
     })
-], WebhookModule);
-//# sourceMappingURL=webhook.module.js.map
+], SubscriptionModule);
+//# sourceMappingURL=subscription.module.js.map

@@ -113,4 +113,20 @@ export class StorageService {
   ): string {
     return `content/${version}/${grade}/${subject}/term-${term}/week-${week}/${resourceType}.${extension}`;
   }
+
+  /**
+   * Download a file into a Buffer
+   */
+  async downloadFile(key: string): Promise<Buffer> {
+    const { data, error } = await this.supabase.storage
+      .from(this.bucket)
+      .download(key);
+
+    if (error || !data) {
+      throw new Error(`Failed to download file: ${error?.message}`);
+    }
+
+    const arrayBuffer = await data.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  }
 }

@@ -3,11 +3,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CurriculumVersion, ResourceType } from '@prisma/client';
 
+import { WatermarkService } from '../content/watermark.service';
+
 @Injectable()
 export class TeacherService {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private watermarkService: WatermarkService,
   ) {}
 
   async getDashboard(schoolId: string) {
@@ -128,7 +131,7 @@ export class TeacherService {
    * This replaces the N+1 pattern of generating all URLs at once.
    * Architecture: 15-minute TTL presigned URLs, DRM enforced server-side
    */
-  async getResourceUrl(resourceId: string, schoolId: string) {
+  async getResourceUrl(resourceId: string, schoolId: string, userId: string) {
     const resource = await this.prisma.resource.findUnique({
       where: { id: resourceId },
       include: {
@@ -159,8 +162,34 @@ export class TeacherService {
     const isDownloadable = ['STUDENT_NOTES', 'OBJECTIVE_QUESTIONS', 'THEORY_QUESTIONS'].includes(resource.type);
     const isViewOnly = ['LESSON_PLAN', 'POWERPOINT', 'LESSON_OBJECTIVES'].includes(resource.type);
 
+    let finalKey = resource.r2Key;
+
+    // Apply PDF watermarking for downloadable files
+    if (isDownloadable && resource.fileName.toLowerCase().endsWith('.pdf')) {
+      const school = await this.prisma.school.findUnique({ where: { id: schoolId } });
+      const buffer = await this.storage.downloadFile(resource.r2Key);
+      
+      const watermarkText = `${school?.name || 'Classitivity'} - ${new Date().toISOString().split('T')[0]}`;
+      const watermarkedBuffer = await this.watermarkService.addWatermark(buffer, watermarkText);
+      
+      const tempKey = `watermarked/${schoolId}/${Date.now()}_${resource.fileName}`;
+      await this.storage.uploadFile(tempKey, watermarkedBuffer, 'application/pdf');
+      finalKey = tempKey;
+    }
+
     // Generate presigned URL with 15-minute TTL (architecture spec)
-    const url = await this.storage.getPresignedUrl(resource.r2Key, 900);
+    const url = await this.storage.getPresignedUrl(finalKey, 900);
+
+    // Log the download if downloadable
+    if (isDownloadable) {
+      await this.prisma.downloadLog.create({
+        data: {
+          userId: userId,
+          lessonResourceId: resource.id,
+          schoolId: schoolId,
+        }
+      });
+    }
 
     return {
       url,
